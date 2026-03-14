@@ -18,12 +18,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-@app.route('/users', methods=['GET', 'POST'])
-def register():
-   
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
+@app.route('/users', methods=['GET'])
+def get_users():
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT username, password FROM users')
+    users = cursor.fetchall()
+    conn.close()
+    return jsonify({"status": "success", "data": users})
     email = data.get('email')
     if not username or not password or not email:
         return jsonify({"status": "error", "message": "Заполните все поля"}), 400
