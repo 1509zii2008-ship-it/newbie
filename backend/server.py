@@ -18,7 +18,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-@app.route('/register', methods=['POST'])
+@app.route('/users', methods=['GET', 'POST'])
 def register():
    
     data = request.json
