@@ -6,9 +6,14 @@
     align-items:center;
 }
 .form-block{
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     
 }
+/* .email-form{
+
+} */
 .click-request{
     width: 100px;
     height: 40px;
