@@ -54,7 +54,6 @@ def get_users():
 
 @app.route('/users', methods=['POST'])
 def add_user():
-    # Получаем JSON данные из запроса
     data = request.get_json(silent=True)
     
     if not data:
