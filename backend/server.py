@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import sqlite3
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -12,31 +13,56 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            email TEXT
         )
     ''')
     conn.commit()
     conn.close()
 
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "success",
+        "message": "Backend is running!",
+        "endpoints": {
+            "all_users": "/users (GET)",
+            "register": "/users (POST)",
+            "profile": "/user/<name> (GET)"
+        }
+    })
+
 @app.route('/users', methods=['GET'])
 def get_users():
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT username, password FROM users')
+    cursor.execute('SELECT username, password, email FROM users')
     users = cursor.fetchall()
     conn.close()
-    return jsonify({"status": "success", "data": users})
+    
+    user_list = [{"username": u[0], "password": u[1], "email": u[2]} for u in users]
+    return jsonify({"status": "success", "data": user_list})
+
+@app.route('/users', methods=['POST'])
+def add_user():
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "No data provided"}), 400
+
+    username = data.get('username')
+    password = data.get('password')
     email = data.get('email')
+
     if not username or not password or not email:
-        return jsonify({"status": "error", "message": "Заполните все поля"}), 400
+        return jsonify({"status": "error", "message": "Fill all fields: username, password, email"}), 400
 
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     try:
-        cursor.execute('INSERT INTO users (username, password , email) VALUES (?, ?, ?)', 
+        cursor.execute('INSERT INTO users (username, password, email) VALUES (?, ?, ?)', 
                        (username, password, email))
         conn.commit()
-        return jsonify({"status": "success", "message": f"Пользователь {username} сохранен!"})
+        return jsonify({"status": "success", "message": f"User {username} saved!"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
@@ -46,14 +72,11 @@ def get_users():
 def get_user_profile(name):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    
     cursor.execute('SELECT username, password, email FROM users WHERE username = ?', (name,))
-    
     user = cursor.fetchone()
     conn.close()
 
     if user:
-        #кортеж
         return jsonify({
             "status": "success",
             "data": {
@@ -62,9 +85,9 @@ def get_user_profile(name):
                 "email": user[2]
             }
         })
-    else:
-        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+    return jsonify({"status": "error", "message": "User not found"}), 404 
 
 if __name__ == '__main__':
-    init_db()  
-    app.run(debug=True,host='0.0.0.0', port=5000)
+    init_db()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
