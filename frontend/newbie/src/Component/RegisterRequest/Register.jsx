@@ -9,7 +9,7 @@ function Register(){
     const [email, setEmail] = useState('');
 
     function changeUsername(e){
-        const result = e.target.value
+        const result = e.target.value.replace(/[^a-zA-Z0-9]/g, '')
         if(result.length <= 20){
             setUsername(e.target.value);
         } else{
@@ -17,7 +17,7 @@ function Register(){
         }
     }
     function changeEmail(e){
-        const result = e.target.value
+        const result = e.target.value.replace(/[^a-zA-Z0-9]/g, '')
         if(result.length <= 15){
             setEmail(e.target.value);
         }else{
@@ -25,8 +25,8 @@ function Register(){
         }
     }
     function changePassword(e){ 
-        const result = e.target.value
-        if(result.length <= 30){
+        const result = e.target.value.replace(/[^a-zA-Z0-9]/g, '')
+        if(result.length <= 20){
             setPassword(e.target.value);
         }else{
             toast.error("Password is more than 30 characters long")
@@ -75,17 +75,26 @@ function Register(){
                     <div className='input-group'>
                     <img src='/icons/User.svg' alt='icon'/>
                     <input className='username-form'  
-                    onChange={changeUsername} placeholder='Username'/>
+                    onChange={changeUsername} 
+                    placeholder='Username'
+                    maxLength="10"
+                    value={username}/>
                     </div>
                     <div className='input-group'>
                     <img src='/icons/Email.svg' alt='icon'/>
                     <input className='email-form' 
-                    onChange={changeEmail} placeholder='Email'/>
+                    onChange={changeEmail} 
+                    placeholder='Email'
+                    maxLength="20"
+                    value={email}/>
                     </div>
                     <div className='input-group'>
                     <img src='/icons/Password.svg' alt='icon'/>
                     <input className='password-form' 
-                    onChange={changePassword} placeholder='Password'/>
+                    onChange={changePassword} 
+                    placeholder='Password'
+                    maxLength="20"
+                    value={password}/>
                     </div>
                     <button 
                     className="btn-register"
