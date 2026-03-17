@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import '../RegisterRequest/styleForm.css'
+import { toast } from 'react-toastify';
 import { useState } from 'react';
+import '../RegisterRequest/styleForm.css'
 
 function Login(){
     const [email, setEmail] = useState('');
@@ -15,15 +16,25 @@ function Login(){
 
     async function postUsers(){
         try{
-            const response = await fetch('https://newbie-9.onrender.com/users', {
+            const response = await fetch('https://newbie-9.onrender.com/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({email, password})
             })
             const data = await response.json();
+
+            if(response.ok){
+                localStorage.setItem('token', data.token);
+                toast.success("Success! Redirecting...")
+                setTimeout(() => {
+                    window.location.href = '/register'
+                }, 3000);
+            } else{
+                toast.error(data.messange || "Wrong email or password")
+            }
             console.log(data)
         }catch(err){
-            console.error(err)
+            toast.warning("Server is sleeping. Try again in 1 minute.")
         } 
     }
 
@@ -50,12 +61,17 @@ function Login(){
                     <div className='input-group'>
                     <img src='/icons/Email.svg' alt='icon'/>
                     <input className='email-form' 
-                    onChange={changeEmail} placeholder='Email'/>
+                    value={email}
+                    onChange={changeEmail} 
+                    placeholder='Email'/>
                     </div>
                     <div className='input-group'>
                     <img src='/icons/Password.svg' alt='icon'/>
                     <input className='password-form' 
-                    onChange={changePassword} placeholder='Password'/>
+                    value={password}
+                    type='password'
+                    onChange={changePassword} 
+                    placeholder='Password'/>
                     </div>
                     <button     
                     className="btn-login"
