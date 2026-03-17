@@ -4,6 +4,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 import time
+import jwt
+from datetime import datetime, timedelta
+
+# --- НАСТРОЙКИ ---
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-123")
+ALGORITHM = "HS256"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 app = FastAPI()
 
@@ -14,51 +21,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
 def get_db_connection():
-    """Функция для безопасного подключения к PostgreSQL"""
-    retries = 5
-    while retries > 0:
-        try:
-            # sslmode='require' обязателен для работы с Neon.tech
-            conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-            return conn
-        except Exception as e:
-            print(f"Ошибка подключения: {e}. Повтор через 2 сек...")
-            retries -= 1
-            time.sleep(2)
-    raise Exception("Не удалось подключиться к облачной базе данных")
+    """Подключение к базе (теперь оно работает, а не pass)"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        return conn
+    except Exception as e:
+        print(f"Ошибка базы: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка подключения к БД")
 
-def init_db():
-    """Создание таблицы пользователей с уникальными полями"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE
-        )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+def create_access_token(username: str):
+    expire = datetime.utcnow() + timedelta(hours=24)
+    to_encode = {"sub": username, "exp": expire}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-try:
-    if DATABASE_URL:
-        init_db()
-except Exception as e:
-    print(f"Ошибка инициализации БД: {e}")
 
 @app.get("/")
 async def home():
-    return {"status": "online", "message": "FastAPI + PostgreSQL is working!"}
+    return {"status": "online", "message": "Backend is running"}
 
 @app.post("/users")
 async def add_user(request: Request):
-    """Регистрация пользователя с проверкой на дубликаты"""
+    """Регистрация: теперь данные реально сохраняются"""
     try:
         data = await request.json()
     except:
@@ -70,49 +57,58 @@ async def add_user(request: Request):
 
     if not u or not p or not e:
         raise HTTPException(status_code=400, detail="Заполните все поля!")
-    if "@" not in e or "." not in e:
-        raise HTTPException(status_code=400, detail="Неправильный емейл!")
     if len(p) < 6:
-        raise HTTPException(status_code=400, detail="Минимум 6 символов!")  
+        raise HTTPException(status_code=400, detail="Пароль слишком короткий!")
 
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)", 
+            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
             (u, p, e)
         )
         conn.commit()
-        return {"status": "success", "message": "Пользователь успешно создан"}
-    
-    except psycopg2.errors.UniqueViolation as err:
+        return {"status": "success", "message": "Пользователь создан"}
+    except psycopg2.errors.UniqueViolation:
         conn.rollback()
-        error_msg = str(err).lower()
-        if "username" in error_msg:
-            raise HTTPException(status_code=400, detail="Это имя пользователя уже занято")
-        elif "email" in error_msg:
-            raise HTTPException(status_code=400, detail="Эта почта уже зарегистрирована")
-        else:
-            raise HTTPException(status_code=400, detail="Такие данные уже существуют")
-            
-    except Exception as err:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(err))
+        raise HTTPException(status_code=400, detail="Логин или почта уже заняты")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.post("/login")
+async def login(request: Request):
+    """Вход и выдача токена"""
+    data = await request.json()
+    u = data.get("username")
+    p = data.get("password")
+
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("SELECT * FROM users WHERE username = %s", (u,))
+        user = cursor.fetchone()
+
+        # Проверяем пароль
+        if not user or user["password"] != p:
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
+        # Генерируем токен
+        token = create_access_token(u)
+        return {"status": "success", "access_token": token, "token_type": "bearer"}
     finally:
         cursor.close()
         conn.close()
 
 @app.get("/users")
 async def get_users():
-    """Получение списка пользователей"""
+    """Проверка списка пользователей"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cursor.execute("SELECT username,password,email FROM users")
+        cursor.execute("SELECT username, email FROM users")
         users = cursor.fetchall()
-        return {"status": "success", "data": users}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"data": users}
     finally:
         cursor.close()
         conn.close()
