@@ -7,8 +7,10 @@ import time
 import jwt
 from datetime import datetime, timedelta
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-later-to-something-long")
+# --- НАСТРОЙКИ ---
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-123")
 ALGORITHM = "HS256"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 app = FastAPI()
 
@@ -19,8 +21,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
 
+def get_db_connection():
+    """Подключение к базе (теперь оно работает, а не pass)"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        return conn
+    except Exception as e:
+        print(f"Ошибка базы: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка подключения к БД")
 
 def create_access_token(username: str):
     expire = datetime.utcnow() + timedelta(hours=24)
@@ -29,55 +39,81 @@ def create_access_token(username: str):
     return encoded_jwt
 
 
-def get_db_connection():
-    pass
-
-
 @app.get("/")
 async def home():
-    return {"status": "online"}
-
+    return {"status": "online", "message": "Backend is running"}
 
 @app.post("/users")
 async def add_user(request: Request):
-    pass
-
-
-@app.post("/login")
-async def login(request: Request):
+    """Регистрация: теперь данные реально сохраняются"""
     try:
         data = await request.json()
     except:
         raise HTTPException(status_code=400, detail="Некорректный JSON")
 
+    u = str(data.get("username", "")).strip()
+    p = str(data.get("password", "")).strip()
+    e = str(data.get("email", "")).strip()
+
+    if not u or not p or not e:
+        raise HTTPException(status_code=400, detail="Заполните все поля!")
+    if len(p) < 6:
+        raise HTTPException(status_code=400, detail="Пароль слишком короткий!")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password, email) VALUES (%s, %s, %s)",
+            (u, p, e)
+        )
+        conn.commit()
+        return {"status": "success", "message": "Пользователь создан"}
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail="Логин или почта уже заняты")
+    finally:
+        cursor.close()
+        conn.close()
+
+@app.post("/login")
+async def login(request: Request):
+    """Вход и выдача токена"""
+    data = await request.json()
     u = data.get("username")
     p = data.get("password")
-
-    if not u or not p:
-        raise HTTPException(status_code=400, detail="Введите логин и пароль")
 
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Ищем юзера в базе
         cursor.execute("SELECT * FROM users WHERE username = %s", (u,))
         user = cursor.fetchone()
 
+        # Проверяем пароль
         if not user or user["password"] != p:
-            raise HTTPException(status_code=401, detail="Неверное имя или пароль")
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
 
+        # Генерируем токен
         token = create_access_token(u)
-
         return {"status": "success", "access_token": token, "token_type": "bearer"}
     finally:
         cursor.close()
         conn.close()
 
-
 @app.get("/users")
 async def get_users():
-    pass
-
+    """Проверка списка пользователей"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("SELECT username, email FROM users")
+        users = cursor.fetchall()
+        return {"data": users}
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == "__main__":
     import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
