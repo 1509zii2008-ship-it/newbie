@@ -30,7 +30,7 @@ function Main(){
             }
         }
         getUsersData()
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
 
     async function RequestCount(){
@@ -58,7 +58,7 @@ function Main(){
         <>
         <div className="main-block">
             <a className="profile-block" href="#">
-                <img className="icon-profile" src="/icons/account.png"/>
+                <img className="icon-profile" src="/icons/account.png" alt="profile"/>
                 <p className="text-username">{username}</p>
             </a>
             <div className="click-block">
