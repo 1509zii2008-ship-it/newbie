@@ -24,13 +24,13 @@ function Login(){
             const data = await response.json();
 
             if(response.ok){
-                localStorage.setItem('token', data.token);
+                localStorage.setItem('token', data.access_token);
                 toast.success("Success! Redirecting...")
                 setTimeout(() => {
-                    window.location.href = '/register'
+                    window.location.href = '/profile'
                 }, 3000);
             } else{
-                toast.error(data.messange || "Wrong email or password")
+                toast.error(data.message || "Wrong email or password")
             }
             console.log(data)
         }catch(err){

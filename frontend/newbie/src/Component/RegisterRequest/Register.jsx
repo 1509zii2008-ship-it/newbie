@@ -69,32 +69,32 @@
                     </div>
                     <div className='form-block'>
                         <div className='input-group'>
-                        <img src='/icons/User.svg' alt='icon'/>
-                        <input className='username-form'  
-                        onChange={changeUsername} 
-                        placeholder='Username'
-                        maxLength="15"
-                        value={username}
-                        required/>
+                            <img src='/icons/User.svg' alt='icon'/>
+                            <input className='username-form'  
+                            onChange={changeUsername} 
+                            placeholder='Username'
+                            maxLength="15"
+                            value={username}
+                            required/>
                         </div>
                         <div className='input-group'>
-                        <img src='/icons/Email.svg' alt='icon'/>
-                        <input className='email-form' 
-                        onChange={changeEmail} 
-                        placeholder='Email'
-                        maxLength="30"
-                        value={email}
-                        required/>
+                            <img src='/icons/Email.svg' alt='icon'/>
+                            <input className='email-form' 
+                            onChange={changeEmail} 
+                            placeholder='Email'
+                            maxLength="30"
+                            value={email}
+                            required/>
                         </div>
                         <div className='input-group'>
-                        <img src='/icons/Password.svg' alt='icon'/>
-                        <input className='password-form'
-                        type='password'
-                        onChange={changePassword} 
-                        placeholder='Password'
-                        maxLength="20"
-                        value={password}
-                        required/>
+                            <img src='/icons/Password.svg' alt='icon'/>
+                            <input className='password-form'
+                            type='password'
+                            onChange={changePassword} 
+                            placeholder='Password'
+                            maxLength="20"
+                            value={password}
+                            required/>
                         </div>
                         <button 
                         className="btn-register"

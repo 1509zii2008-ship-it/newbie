@@ -4,15 +4,17 @@ import 'react-toastify/dist/ReactToastify.css';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Register from './Component/RegisterRequest/Register';
 import Login from './Component/LoginRequest/Login'
+import Main from './Component/Main/Main'
 
 function App() {
   return (
     <Router>
     <div className="main-app">
       <Routes>
-        <Route path='/' element={<Navigate to='/register'/>}/>
+        <Route path='/' element={<Navigate to='/login'/>}/>
         <Route path='/register' element={<Register/>}/>
         <Route path='/login' element={<Login/>}/>
+        <Route path='/profile' element={<Main/>}/>
       </Routes>
         <ToastContainer 
           position="top-right" 
