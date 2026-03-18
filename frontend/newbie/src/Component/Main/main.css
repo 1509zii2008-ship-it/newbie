@@ -24,6 +24,8 @@
     font-weight: 700;
     color: #000;
     cursor: pointer;
+    background-color: transparent;
+    border: none;
 }
 .text-username{
     font-size: 25px;

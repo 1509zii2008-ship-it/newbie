@@ -57,10 +57,10 @@ function Main(){
     return(
         <>
         <div className="main-block">
-            <a className="profile-block" href="#">
+            <button className="profile-block">
                 <img className="icon-profile" src="/icons/account.png" alt="profile"/>
                 <p className="text-username">{username}</p>
-            </a>
+            </button>
             <div className="click-block">
                 <h1 className="top-text">Welcome {username}</h1>
                 <div className="click-section">
