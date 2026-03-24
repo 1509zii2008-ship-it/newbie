@@ -10,9 +10,34 @@ import random
 import smtplib
 from email.message import EmailMessage
 
+# Настройки
+SENDER_EMAIL = "1509zii2008@gmail.com"
+SENDER_PASSWORD = "ycno tmuz zhsz ixbq"
+SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-123")
+ALGORITHM = "HS256"
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://user:pass@host:5432/dbname")
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# БД
+def get_db_connection():
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+        return conn
+    except Exception as e:
+        print(f"Ошибка базы: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка подключения к БД")
+
 
 def init_db():
-    """Эта функция создаст таблицу автоматически при запуске сервера"""
     conn = None
     try:
         conn = get_db_connection()
@@ -31,52 +56,31 @@ def init_db():
         """
         )
         conn.commit()
-        print(" База данных проверена и готова к работе")
+        print("База данных проверена")
     except Exception as e:
-        print(f" Ошибка инициализации базы: {e}")
+        print(f"Ошибка инициализации базы: {e}")
     finally:
         if conn:
-            cursor.close()
             conn.close()
 
 
 init_db()
 
-SENDER_EMAIL = "1509zii2008@gmail.com"
-SENDER_PASSWORD = "ycno tmuz zhsz ixbq"
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-123")
-ALGORITHM = "HS256"
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://user:pass@host:5432/dbname")
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-def get_db_connection():
-    try:
-        conn = psycopg2.connect(DATABASE_URL, sslmode="require")
-        return conn
-    except Exception as e:
-        print(f"Ошибка базы: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка подключения к БД")
-
-
+# ТОКЕН
 def create_access_token(username: str):
     expire = datetime.utcnow() + timedelta(hours=24)
     to_encode = {"sub": username, "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# РУТЫ
+
+
 @app.get("/")
 async def home():
     return {"status": "online", "message": "Backend is running"}
+
 
 @app.post("/users")
 async def add_user(request: Request):
@@ -91,14 +95,13 @@ async def add_user(request: Request):
 
     if not u or not p or not e:
         raise HTTPException(status_code=400, detail="Заполните все поля!")
-    if len(p) < 6:
-        raise HTTPException(status_code=400, detail="Пароль слишком короткий!")
 
     verification_code = str(random.randint(1000, 9999))
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
+        # ОТПРАВКА ПИСЬМА С КОДОМ ПОДТВЕРЖДЕНИЯ
         msg = EmailMessage()
         msg.set_content(f"Ваш код подтверждения: {verification_code}")
         msg["Subject"] = "Код подтверждения"
@@ -122,8 +125,36 @@ async def add_user(request: Request):
     except Exception as err:
         if conn:
             conn.rollback()
-        print(f"Ошибка: {err}")
-        raise HTTPException(status_code=400, detail="Ошибка при регистрации")
+        raise HTTPException(status_code=400, detail=f"Ошибка: {err}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.post("/login")
+async def login(request: Request):
+    data = await request.json()
+    email = data.get("email")
+    password = data.get("password")
+
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+        user = cursor.fetchone()
+
+        if not user or user["password"] != password:
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+
+        if not user.get("is_active"):
+            return {
+                "status": "pending_verification",
+                "message": "Необходимо подтвердить почту",
+                "email": email,
+            }
+
+        token = create_access_token(email)
+        return {"status": "success", "access_token": token, "token_type": "bearer"}
     finally:
         cursor.close()
         conn.close()
@@ -152,32 +183,16 @@ async def verify_email(request: Request):
             (email,),
         )
         conn.commit()
-        return {"status": "success", "message": "Почта подтверждена!"}
-    finally:
-        cursor.close()
-        conn.close()
 
+        # ПОЛУЧЕНИЕ ТОКЕНА ПОСЛЕ ВЕРИФИКАЦИИ
+        token = create_access_token(email)
 
-@app.post("/login")
-async def login(request: Request):
-    data = await request.json()
-    u = data.get("email")
-    p = data.get("password")
-
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute("SELECT * FROM users WHERE email = %s", (u,))
-        user = cursor.fetchone()
-
-        if not user or user["password"] != p:
-            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
-
-        if not user.get("is_active"):
-            raise HTTPException(status_code=403, detail="Подтвердите почту!")
-
-        token = create_access_token(u)
-        return {"status": "success", "access_token": token, "token_type": "bearer"}
+        return {
+            "status": "success",
+            "message": "Почта подтверждена!",
+            "access_token": token,
+            "token_type": "bearer",
+        }
     finally:
         cursor.close()
         conn.close()
@@ -192,16 +207,15 @@ async def toggle_favorite(request: Request):
     try:
         item_data = await request.json()
         product_id = item_data.get("id")
+        token = auth_header.split(" ")[1]
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_email = payload.get("sub")
     except:
-        raise HTTPException(status_code=400, detail="Некорректные данные")
+        raise HTTPException(status_code=400, detail="Ошибка авторизации или данных")
 
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        token = auth_header.split(" ")[1]
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_email = payload.get("sub")
-
         cursor.execute("SELECT basket FROM users WHERE email = %s", (user_email,))
         result = cursor.fetchone()
 
@@ -247,6 +261,8 @@ async def get_me(request: Request):
         )
         user_data = cursor.fetchone()
         return {"status": "success", "data": user_data}
+    except:
+        raise HTTPException(status_code=401, detail="Невалидный токен")
     finally:
         cursor.close()
         conn.close()
