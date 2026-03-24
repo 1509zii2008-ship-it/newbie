@@ -86,49 +86,45 @@ async def home():
 async def add_user(request: Request):
     try:
         data = await request.json()
-    except:
-        raise HTTPException(status_code=400, detail="Некорректный JSON")
+        u = str(data.get("username", "")).strip()
+        p = str(data.get("password", "")).strip()
+        e = str(data.get("email", "")).strip()
 
-    u = str(data.get("username", "")).strip()
-    p = str(data.get("password", "")).strip()
-    e = str(data.get("email", "")).strip()
+        if not u or not p or not e:
+            raise HTTPException(status_code=400, detail="Заполните все поля!")
 
-    if not u or not p or not e:
-        raise HTTPException(status_code=400, detail="Заполните все поля!")
+        verification_code = str(random.randint(1000, 9999))
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    verification_code = str(random.randint(1000, 9999))
-    conn = get_db_connection()
-    cursor = conn.cursor()
+        try:
+            msg = EmailMessage()
+            msg.set_content(f"Ваш код: {verification_code}")
+            msg["Subject"] = "Код подтверждения"
+            msg["From"] = SENDER_EMAIL
+            msg["To"] = e
 
-    try:
-        # ОТПРАВКА ПИСЬМА С КОДОМ ПОДТВЕРЖДЕНИЯ
-        msg = EmailMessage()
-        msg.set_content(f"Ваш код подтверждения: {verification_code}")
-        msg["Subject"] = "Код подтверждения"
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = e
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+                smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
+                smtp.send_message(msg)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(SENDER_EMAIL, SENDER_PASSWORD)
-            smtp.send_message(msg)
+            cursor.execute(
+                "INSERT INTO users (username, password, email, verification_code, is_active) VALUES (%s, %s, %s, %s, FALSE)",
+                (u, p, e, verification_code),
+            )
+            conn.commit()
+            return {"status": "success", "message": "Код отправлен!"}
 
-        cursor.execute(
-            "INSERT INTO users (username, password, email, verification_code, is_active) VALUES (%s, %s, %s, %s, FALSE)",
-            (u, p, e, verification_code),
-        )
-        conn.commit()
-        return {"status": "success", "message": "Код отправлен на почту!"}
-
-    except psycopg2.errors.UniqueViolation:
-        conn.rollback()
-        raise HTTPException(status_code=400, detail="Логин или почта уже заняты")
-    except Exception as err:
-        if conn:
+        except Exception as internal_err:
+            print(f"КРИТИЧЕСКАЯ ОШИБКА: {internal_err}")
             conn.rollback()
-        raise HTTPException(status_code=400, detail=f"Ошибка: {err}")
-    finally:
-        cursor.close()
-        conn.close()
+            raise HTTPException(status_code=400, detail=f"Ошибка: {str(internal_err)}")
+        finally:
+            cursor.close()
+            conn.close()
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/login")
