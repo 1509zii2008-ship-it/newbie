@@ -7,7 +7,8 @@ import jwt
 from datetime import datetime, timedelta
 import json
 import random
-import httpx 
+import httpx
+
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 SECRET_KEY = os.environ.get("SECRET_KEY", "your-super-secret-key")
@@ -22,54 +23,53 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
-# --- ФУНКЦИЯ ОТПРАВКИ КОДА ЧЕРЕЗ API ---
+
 async def send_verification_email(email: str, code: str):
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
     payload = {
-        "from": "onboarding@resend.dev", # Пока нет своего домена, используем этот
+        "from": "onboarding@resend.dev",
         "to": email,
         "subject": "Код подтверждения",
-        "html": f"<p>Ваш код для входа: <strong>{code}</strong></p>"
+        "html": f"<p>Ваш код для входа: <strong>{code}</strong></p>",
     }
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=headers, json=payload)
         return response.status_code == 200 or response.status_code == 201
 
+
 def create_access_token(email: str):
     expire = datetime.utcnow() + timedelta(hours=24)
     return jwt.encode({"sub": email, "exp": expire}, SECRET_KEY, algorithm=ALGORITHM)
 
-# --- ЭНДПОИНТЫ ---
 
 @app.post("/users")
 async def register(request: Request):
     data = await request.json()
     u, p, e = data.get("username"), data.get("password"), data.get("email")
-    
+
     if not all([u, p, e]):
         raise HTTPException(status_code=400, detail="Заполните все поля")
 
     code = str(random.randint(1000, 9999))
-    
-    # 1. Отправляем код через API (Render это не заблокирует)
+
     email_success = await send_verification_email(e, code)
     if not email_success:
         raise HTTPException(status_code=500, detail="Ошибка отправки письма через API")
 
-    # 2. Сохраняем в базу
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "INSERT INTO users (username, password, email, verification_code, is_active) VALUES (%s, %s, %s, %s, FALSE)",
-            (u, p, e, code)
+            (u, p, e, code),
         )
         conn.commit()
         return {"status": "success", "message": "Код отправлен"}
@@ -79,11 +79,12 @@ async def register(request: Request):
         cursor.close()
         conn.close()
 
+
 @app.post("/login")
 async def login(request: Request):
     data = await request.json()
     e, p = data.get("email"), data.get("password")
-    
+
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT * FROM users WHERE email = %s AND password = %s", (e, p))
@@ -98,29 +99,34 @@ async def login(request: Request):
 
     return {"status": "success", "access_token": create_access_token(e)}
 
+
 @app.post("/verify-email")
 async def verify(request: Request):
     data = await request.json()
     e, c = data.get("email"), str(data.get("code"))
-    
+
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT * FROM users WHERE email = %s AND verification_code = %s", (e, c))
+    cursor.execute(
+        "SELECT * FROM users WHERE email = %s AND verification_code = %s", (e, c)
+    )
     user = cursor.fetchone()
 
     if not user:
         conn.close()
         raise HTTPException(status_code=400, detail="Неверный код")
-
-    # Активируем аккаунт
-    cursor.execute("UPDATE users SET is_active = TRUE, verification_code = NULL WHERE email = %s", (e,))
+    cursor.execute(
+        "UPDATE users SET is_active = TRUE, verification_code = NULL WHERE email = %s",
+        (e,),
+    )
     conn.commit()
     conn.close()
 
-    # ТОЛЬКО ТУТ ВЫДАЕМ ТОКЕН
     return {"status": "success", "access_token": create_access_token(e)}
+
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
