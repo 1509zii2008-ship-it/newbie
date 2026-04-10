@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
 import './header.css'
 
-function Header({quality, username}){
+function Header({quality, username, onCartClick}){
 
     return(
       <header className="header">
@@ -11,7 +10,7 @@ function Header({quality, username}){
           <input type="text" placeholder="Search..."/>
         </div>
         <div className="header__right-side">
-          <div className="header__cart-wrapper">
+          <div className="header__cart-wrapper" onClick={onCartClick}>
             <span className="header__cart-icon">🛒</span>
             <span className="header__cart-count">{quality}</span>
           </div>

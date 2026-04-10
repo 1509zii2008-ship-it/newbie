@@ -29,7 +29,7 @@ body{
   flex-direction: column;
   background: linear-gradient(180deg, #99D0EF, #FFFFFF );
   width: 100vw;
-  height: 100vh;
+  height: 100%;
   padding: 0 180px;
   box-sizing: border-box;
   overflow-x: hidden;

@@ -4,15 +4,33 @@ import Header from "../Header/Header";
 import SideBar from "../SideBar/SideBar";
 import ProductCards from "../ProductCrads/ProductCards";
 import ProductData from '../../data/cards.json';
+import Cart from "../Cart/Cart";
 import "./main.css";
 
 function Main() {
   const [count, setCount] = useState(0);
   const [username, setUsername] = useState("");
   const [countLength, setCountLength] = useState(0);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartId, setCartId] = useState([]);
 
   function addCountCards(){
     setCountLength(countLength + 1)
+  }
+
+  function addCartId(newCartId){
+    const newId = ProductData.find((item) => item.id === newCartId);
+    if(newId){
+      setCartId([...cartId, newId]);
+      setCountLength(count => count + 1);
+      console.log(newId);
+    }else{
+    toast.error('Ops...');
+  }
+}
+
+  function toggleCart(){
+    setIsCartOpen(!isCartOpen)
   }
 
   useEffect(() => {
@@ -44,7 +62,9 @@ function Main() {
 
   return (
   <>
+  <Cart cartId={cartId}  isOpen={isCartOpen} onClose={toggleCart} />
       <Header 
+      onCartClick={toggleCart}
       quality={countLength}
       username={username}
       />
@@ -53,12 +73,14 @@ function Main() {
       <section className="column-cards">
         {ProductData.map((item) => (
           <ProductCards
-          key={item.id}
+          id={item.id}
           title={item.title}
+          img={item.img}
           description={item.description}
           price={item.price}
           reviews={item.reviews}
           addCountCards={addCountCards}
+          clickId={addCartId}
           />
         ))}
       </section>

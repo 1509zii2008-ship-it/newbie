@@ -8,6 +8,7 @@ import Main from './Component/Main/Main'
 import Verify from './Component/Verify/Verify';
 import Profile from './Component/Profile/Profile';
 import ProductPage from './Component/ProductPage/ProductPage';
+import Cart from './Component/Cart/Cart';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path='/verify' element={<Verify/>}/>
         <Route path='/profile' element={<Profile/>}/>
         <Route path='/cardspage' element={<ProductPage/>}/>
+        <Route path='/cartpage' element={<Cart/>}/>
 
       </Routes>
         <ToastContainer 

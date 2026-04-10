@@ -2,18 +2,20 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import "./productcards.css";
 
-function ProductCards({ addCountCards, category, title, description, price, reviews }) {
+function ProductCards({ id, clickId, addCountCards, category, title, img, description, price, reviews }) {
   let navigate = useNavigate();
   function clickAdd(e){
+    clickId(id);
+    addCountCards(id)
     e.stopPropagation()
-    addCountCards()
+    console.log(id)
   }
   return (
     <div className="product-card" onClick={() => navigate("/cardspage")}>
       <span className="product-card__badge">{category || "New"}</span>
       <div className="product-card__image-container">
         <img
-          src="https://picsum.photos/300/200"
+          src={img}
           alt='photo cards'
           className="product-card__img"
         />
